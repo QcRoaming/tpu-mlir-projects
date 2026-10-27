@@ -1,0 +1,37 @@
+flowchart TB
+    C["离线编译：PT → ONNX → Top MLIR<br/>F16 或 INT8 校准／可选混合精度 → BModel"] -.-> I
+    I["run.py 创建 backend、视频源和 Pipeline<br/>初始化 3 条有界队列与输入 BufferPool"]
+    I --> START["Pipeline.run 启动 7 个工作线程<br/>4 个解码 + 1 个预处理 + 1 个推理 + 1 个后处理"]
+    START --> D0["视频 0：解码线程"]
+    START --> D1["视频 1：解码线程"]
+    START --> D2["视频 2：解码线程"]
+    START --> D3["视频 3：解码线程"]
+    D0 --> Q0[("Q0：原始帧 Packet")]
+    D1 --> Q0
+    D2 --> Q0
+    D3 --> Q0
+    Q0 --> P["唯一预处理线程<br/>取得独占输入缓冲 → Letterbox / RGB / NCHW"]
+    P --> Q1[("Q1：Packet + 输入 tensor + meta")]
+    Q1 --> N["唯一推理线程，batch = 1<br/>backend.infer 同步完成 → 复制输出 → 归还输入缓冲<br/>设备后端：单个 Net.forward，绑定所选设备"]
+    N --> Q2[("Q2：Packet + 独立输出 + meta")]
+    Q2 --> O["唯一后处理线程<br/>阈值过滤 → 按类 NMS → 坐标还原<br/>输出结果，累计 completed / 延迟 / FPS"]
+    B[("BufferPool：可复用输入 tensor")]
+    B -.->|acquire；无空闲则等待| P
+    N -.->|同步推理和输出复制后 release| B
+    POLICY["三条队列均使用同一策略<br/>block：满队列时生产者等待<br/>drop-oldest：淘汰该队列最旧 Packet<br/>丢弃时归还其持有的输入缓冲并累计 dropped"] -.-> Q0
+    POLICY -.-> Q1
+    POLICY -.-> Q2
+    CLOSE["全部解码结束 → 关闭 Q0<br/>预处理排空 → 关闭 Q1<br/>推理排空 → 关闭 Q2<br/>后处理排空 → 工作线程退出"]
+    START -.->|正常收尾规则| CLOSE
+    ERR["任一阶段失败：记录错误 → stop + abort 三队列<br/>清理排队 Packet、唤醒等待线程，传播异常<br/>正在 native 调用中的线程需返回后才能释放其资源"]
+    START -.->|异常收尾规则| ERR
+    classDef cpu fill:#EFF6FF,stroke:#2563EB,color:#16365D;
+    classDef device fill:#F0FDFA,stroke:#0D9488,color:#134E4A;
+    classDef state fill:#FFF7ED,stroke:#D97706,color:#78350F;
+    classDef offline fill:#F1F5F9,stroke:#94A3B8,color:#334155;
+    classDef error fill:#FEF2F2,stroke:#DC2626,color:#7F1D1D;
+    class D0,D1,D2,D3,P,O,START cpu;
+    class N device;
+    class Q0,Q1,Q2,B,POLICY state;
+    class C,I,CLOSE offline;
+    class ERR error;

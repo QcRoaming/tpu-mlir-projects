@@ -1,0 +1,8 @@
+{
+  "streams": [
+    {"id": "camera0", "source": "videos/camera0.mp4"},
+    {"id": "camera1", "source": "videos/camera1.mp4"},
+    {"id": "camera2", "source": "videos/camera2.mp4"},
+    {"id": "camera3", "source": "videos/camera3.mp4"}
+  ]
+}

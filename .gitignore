@@ -1,0 +1,54 @@
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.*
+
+# Compiler, SDK and native build products
+build/
+build-*/
+install/
+cross_toolchains/
+CMakeFiles/
+CMakeCache.txt
+*.o
+*.a
+*.so
+*.so.*
+
+# Local models, datasets, videos and generated reports
+artifacts/
+runs/
+tmp/
+models/
+weights/
+datasets/
+COCO2017/
+videos/
+*.bmodel
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.gguf
+*.npz
+*.npy
+*.mlir
+*.log
+*.jsonl
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.tar
+*.tar.gz
+*.zip
+
+# Local editor and OS metadata
+.idea/
+.vscode/
+.DS_Store

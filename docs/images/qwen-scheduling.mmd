@@ -1,0 +1,24 @@
+flowchart TB
+    C["离线编译：本地权重 → llm_convert<br/>BF16 / W4BF16 → 组合 BModel"] -.-> I
+    I["启动：Python 创建一个 C++ worker<br/>worker 加载 BModel，分配设备 KV 和隐藏状态缓冲"]
+    I --> P["Python generate：对话模板 → token IDs<br/>检查容量，确定本轮输出上限"]
+    P --> R{"启用复用且缓存有效<br/>新 prompt 严格长于缓存<br/>已有 token 前缀完全一致？"}
+    R -->|否：IPC PREFILL| F["worker：完整 Prefill<br/>embedding → 逐层 block_i<br/>各层 K/V 写入设备缓存，L = prompt 长度<br/>取最后有效 hidden → LM head"]
+    R -->|是：IPC APPEND| A["worker：校验 expected_length<br/>只遍历新增 prompt 后缀<br/>每个 token 执行单 token 步骤并追加 KV<br/>仅最后一个新增 token 执行 LM head"]
+    F --> T["IPC 返回 token ID → Python 解码和输出文本"]
+    A --> T
+    T --> E{"EOS 或达到输出／容量上限？"}
+    E -->|否：IPC DECODE| D["worker：送入上一预测 token<br/>embedding_cache → 逐层 block_cache_i<br/>每层读取历史 KV，追加当前 KV，完成后 L += 1<br/>LM head 预测下一个 token"]
+    D --> T
+    E -->|是| S["本轮完成，保留当前会话设备 KV<br/>cached_ids = prompt_ids + generated_ids 去掉最后一项"]
+    S -.->|下一轮重新检查前缀| P
+    K["单 token 步骤：position = L<br/>mask 放行历史 0 至 L-1 和当前列 S<br/>各层新 KV 写入缓存槽 L<br/>每次子网 launch 和 KV 复制后同步"] -.-> D
+    K -.-> A
+    classDef cpu fill:#EFF6FF,stroke:#2563EB,color:#16365D;
+    classDef device fill:#F0FDFA,stroke:#0D9488,color:#134E4A;
+    classDef state fill:#FFF7ED,stroke:#D97706,color:#78350F;
+    classDef offline fill:#F1F5F9,stroke:#94A3B8,color:#334155;
+    class P,T,E,R cpu;
+    class F,A,D device;
+    class I,K,S state;
+    class C offline;

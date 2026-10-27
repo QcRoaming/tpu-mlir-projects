@@ -1,0 +1,5 @@
+# Small CPU dependencies; compiler/SDK dependencies belong to their own environment.
+numpy==1.24.3
+opencv-python-headless==4.8.0.76
+onnx==1.14.1
+onnxruntime==1.16.3
